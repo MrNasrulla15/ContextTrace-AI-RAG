@@ -53,13 +53,10 @@ async function runEvaluationBenchmark() {
         for (const tc of evalDataset.cases) {
             process.stdout.write(`  Running: [${tc.id}] ${tc.category}... `);
 
-            // Mock external AI response appropriately for deterministic evaluation
-            let spy;
-            if (!tc.expectedAbstention) {
-                const targetDocTitle = tc.expectedEvidenceDocTitles[0];
-                const targetDoc = seededMap.get(targetDocTitle);
-                spy = jestOrStubAi(targetDoc);
-            }
+            // Mock external AI response appropriately for deterministic, quota-free evaluation
+            const targetDocTitle = tc.expectedEvidenceDocTitles?.[0];
+            const targetDoc = targetDocTitle ? seededMap.get(targetDocTitle) : null;
+            const spy = jestOrStubAi(targetDoc, tc.expectedAbstention);
 
             const startTime = Date.now();
             let resultData = null;
@@ -72,8 +69,8 @@ async function runEvaluationBenchmark() {
             };
 
             const res = {
-                status: function(code) { this.statusCode = code; return this; },
-                json: function(data) { resultData = data; return this; }
+                status: function (code) { this.statusCode = code; return this; },
+                json: function (data) { resultData = data; return this; }
             };
 
             await chatController.askQuestion(req, res);
@@ -131,12 +128,14 @@ async function runEvaluationBenchmark() {
     }
 }
 
-function jestOrStubAi(targetDoc) {
+function jestOrStubAi(targetDoc, expectedAbstention) {
     const original = aiService.getAIResponse;
     aiService.getAIResponse = async () => ({
-        answer: targetDoc ? `Synthesized factual grounded answer referencing ${targetDoc.title}.` : 'No evidence.',
-        citedDocumentIds: targetDoc ? [targetDoc._id.toString()] : [],
-        insufficientEvidence: !targetDoc
+        answer: expectedAbstention || !targetDoc
+            ? 'The provided internal documentation does not contain enough information to answer this question.'
+            : `Synthesized factual grounded answer referencing ${targetDoc.title}.`,
+        citedDocumentIds: expectedAbstention || !targetDoc ? [] : [targetDoc._id.toString()],
+        insufficientEvidence: Boolean(expectedAbstention || !targetDoc)
     });
     return {
         restore: () => { aiService.getAIResponse = original; }

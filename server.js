@@ -1,13 +1,8 @@
 require('dotenv').config();
 const app = require('./backend/app');
 const { validateEnv } = require('./backend/config/env');
-const connectDB = require('./database/connection');
-
 // Validate environment variables on startup
 const envConfig = validateEnv();
-
-// Connect to database
-connectDB();
 
 const PORT = envConfig.port || process.env.PORT || 5000;
 const server = app.listen(PORT, () => {
