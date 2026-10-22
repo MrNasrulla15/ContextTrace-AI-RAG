@@ -1,6 +1,6 @@
 <div align="center">
   <img src="docs/assets/logo.png" alt="ContextTrace AI Logo" width="340" />
-  <h1>ContextTrace AI</h1>
+  <h1>ContextTrace AI RAG</h1>
   <p><strong>Grounded Retrieval-Augmented Generation Backend with Verifiable Citations and Immutable Forensic Audit Trails</strong></p>
 
   [![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
