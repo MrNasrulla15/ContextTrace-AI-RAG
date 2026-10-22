@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ContextTrace AI — Grounded Synthesis & Forensic Audit Trails</title>
+    <meta name="description" content="Production-grade RAG workspace with verifiable citations, answer-time evidence snapshots, and auditable traces.">
+    
+    <!-- Prevent theme flash before paint -->
+    <script>
+        (function() {
+            try {
+                const savedTheme = localStorage.getItem('contexttrace_theme');
+                const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {}
+        })();
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Top Global Header -->
+    <header class="app-header">
+        <div class="header-brand">
+            <div class="brand-logo" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="m9 12 2 2 4-4"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="brand-title">ContextTrace AI</h1>
+                <p class="brand-subtitle">Grounded Knowledge Retrieval & Auditable Evidence Traces</p>
+            </div>
+        </div>
+
+        <div class="header-controls">
+            <div class="control-pill" title="X-Tenant-Id isolation header">
+                <label for="tenantInput">Tenant</label>
+                <input type="text" id="tenantInput" value="default" placeholder="default">
+            </div>
+            <div class="control-pill" title="X-API-Key authentication header">
+                <label for="apiKeyInput">Key</label>
+                <input type="password" id="apiKeyInput" placeholder="Optional">
+            </div>
+            <div class="system-status" id="systemStatusBadge" title="Server Connection Status">
+                <span class="status-dot"></span>
+                <span class="status-text">Checking API...</span>
+            </div>
+            <button type="button" id="themeToggleBtn" class="theme-toggle-btn" aria-label="Toggle light or dark visual theme" title="Toggle theme (Light / Dark)">
+                <!-- Shown in dark theme to switch to light -->
+                <svg class="theme-icon-dark" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="4"/>
+                    <path d="M12 2v2"/>
+                    <path d="M12 20v2"/>
+                    <path d="m4.93 4.93 1.41 1.41"/>
+                    <path d="m17.66 17.66 1.41 1.41"/>
+                    <path d="M2 12h2"/>
+                    <path d="M20 12h2"/>
+                    <path d="m6.34 17.66-1.41 1.41"/>
+                    <path d="m19.07 4.93-1.41 1.41"/>
+                </svg>
+                <!-- Shown in light theme to switch to dark -->
+                <svg class="theme-icon-light" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="app-nav" aria-label="Main Navigation">
+        <button class="nav-tab active" id="tabAskBtn" data-tab="askView">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            Ask & Verify
+        </button>
+        <button class="nav-tab" id="tabDocsBtn" data-tab="docsView">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+            </svg>
+            Knowledge Base <span class="nav-badge" id="docCountBadge">0</span>
+        </button>
+        <button class="nav-tab" id="tabHistoryBtn" data-tab="historyView">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Audit History
+        </button>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="app-content">
+        <!-- Notification Banner Container -->
+        <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+        <!-- TAB 1: ASK & VERIFY WORKSPACE -->
+        <section id="askView" class="tab-pane active" aria-labelledby="tabAskBtn">
+            <div class="workspace-grid">
+                <!-- Left: Question Input & Quick Starters -->
+                <div class="workspace-card query-card">
+                    <div class="section-header">
+                        <h2 class="section-heading">Ask Knowledge Base</h2>
+                        <p class="section-desc">Every response is strictly synthesized from authorized documents with verifiable citation links.</p>
+                    </div>
+
+                    <!-- Target Document Upload for Scoped Q&A -->
+                    <div class="upload-section">
+                        <label class="form-label" style="display: block; margin-bottom: 0.35rem; font-size: 0.8rem; font-weight: 500; color: var(--text-secondary);">Target Document (Optional — Upload file to scope Q&A):</label>
+                        <div id="askUploadDropzone" class="upload-dropzone">
+                            <input type="file" id="askFileInput" class="file-input-hidden" accept=".pdf,.txt,.md,.json,.csv,.log">
+                            <div class="dropzone-content">
+                                <svg class="dropzone-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17 8 12 3 7 8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                                <div class="dropzone-text">
+                                    <span class="dropzone-prompt"><strong>Drop document here</strong> or click to browse</span>
+                                    <span class="dropzone-sub">PDF, TXT, MD, JSON (Auto-extracts & targets Q&A)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Attached Document Pill (Hidden until a document is uploaded) -->
+                        <div id="attachedDocPill" class="attached-doc-pill" style="display: none;">
+                            <div class="pill-info">
+                                <span class="pill-icon">📄</span>
+                                <div style="display: flex; flex-direction: column;">
+                                    <span class="pill-title" id="attachedDocTitle">Document.pdf</span>
+                                    <span class="pill-meta" id="attachedDocMeta">v1 • SHA: e3b0c442</span>
+                                </div>
+                            </div>
+                            <button type="button" id="detachDocBtn" class="pill-remove-btn" title="Detach document and ask entire knowledge base">✕ Detach</button>
+                        </div>
+                    </div>
+
+                    <form id="askForm" class="ask-form">
+                        <div class="form-group">
+                            <label for="questionInput">Your Question</label>
+                            <textarea id="questionInput" rows="4" placeholder="Ask anything about policies, guidelines, or procedures... (e.g. How many annual leave days do I get each year?)" required></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" id="submitQuestionBtn" class="btn btn-primary">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="22" y1="2" x2="11" y2="13"/>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                </svg>
+                                Synthesize Grounded Answer
+                            </button>
+                            <button type="button" id="clearQuestionBtn" class="btn btn-secondary">Clear</button>
+                            <span class="shortcut-hint">Ctrl + Enter</span>
+                        </div>
+                    </form>
+
+                    <div class="quick-queries">
+                        <span class="quick-title">Quick Example:</span>
+                        <div class="chip-container" id="quickQueryChips">
+                            <button type="button" class="chip" data-query="What is the employee annual leave allowance?">Annual leave policy</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Answer & Evidence Trace Area -->
+                <div class="workspace-card result-card">
+                    <div class="section-header">
+                        <h2 class="section-heading">Synthesized Answer & Evidence</h2>
+                        <p class="section-desc">Inspect supporting excerpts, verification outcomes, and audit metadata.</p>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="answerEmptyState" class="state-container empty-state">
+                        <svg class="state-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="11" cy="11" r="8"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                        <p class="state-title">No question submitted yet</p>
+                        <p class="state-desc">Ask a question or upload a document on the left to inspect grounded evidence.</p>
+                    </div>
+
+                    <!-- Loading State with Skeletons -->
+                    <div id="answerLoadingState" class="state-container loading-state" style="display: none; align-items: stretch; text-align: left; padding: 2rem;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+                            <div class="spinner"></div>
+                            <div>
+                                <p class="state-title" style="margin-bottom: 0;">Retrieving knowledge candidates...</p>
+                                <p class="state-desc" style="font-size: 0.75rem; margin: 0;">Scoring relevance, verifying citations, and invoking Gemini.</p>
+                            </div>
+                        </div>
+                        <div class="skeleton-container">
+                            <div class="skeleton-bar" style="width: 90%;"></div>
+                            <div class="skeleton-bar" style="width: 100%;"></div>
+                            <div class="skeleton-bar" style="width: 75%;"></div>
+                            <div class="skeleton-bar" style="width: 85%; margin-top: 0.5rem;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Explicit Abstention Banner -->
+                    <div id="abstentionBanner" class="alert-banner alert-warning" style="display: none;">
+                        <svg class="alert-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <div>
+                            <strong>Explicit Abstention (Zero Hallucination Protocol)</strong>
+                            <p id="abstentionReason" style="margin-top: 0.2rem; font-size: 0.8125rem;">No matching private documents or insufficient factual evidence was found to answer reliably.</p>
+                        </div>
+                    </div>
+
+                    <!-- Answer Content Display -->
+                    <div id="answerDisplay" class="answer-display" style="display: none;">
+                        <div class="answer-box">
+                            <div class="answer-header">
+                                <div class="answer-meta-cluster">
+                                    <span class="badge badge-success" id="verifiedStatusBadge">Grounded & Verified</span>
+                                    <span class="meta-tag" id="answerModelTag">gemini-3.5-flash-lite</span>
+                                    <span class="meta-tag" id="answerLatencyTag">0 ms</span>
+                                </div>
+                                <button type="button" id="copyAnswerBtn" class="btn btn-secondary btn-sm" title="Copy answer to clipboard">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                    </svg>
+                                    Copy
+                                </button>
+                            </div>
+                            <div class="answer-text" id="answerText"></div>
+                        </div>
+
+                        <!-- Cited Evidence Sources -->
+                        <div class="sources-section">
+                            <h3 class="subsection-heading">
+                                Verified Citations (<span id="sourceCountBadge">0</span>)
+                            </h3>
+                            <div class="sources-list" id="sourcesList"></div>
+                        </div>
+
+                        <!-- Forensic Meta Footer -->
+                        <div class="audit-meta-footer">
+                            <div class="meta-item">
+                                <span class="meta-label">Request ID:</span>
+                                <code id="answerRequestId" class="code-badge">-</code>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Prompt Version:</span>
+                                <span id="answerPromptVersion" class="badge badge-info">v1.1</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Outcome:</span>
+                                <span id="answerVerificationOutcome" class="badge badge-success">PASSED</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: KNOWLEDGE BASE (DOCUMENT INGESTION & MANAGEMENT) -->
+        <section id="docsView" class="tab-pane" aria-labelledby="tabDocsBtn">
+            <div class="workspace-grid">
+                <!-- Ingestion Form -->
+                <div class="workspace-card form-card">
+                    <div class="section-header">
+                        <h2 class="section-heading">Ingest Knowledge Document</h2>
+                        <p class="section-desc">Indexed with SHA-256 deduplication and storage-guarded retention policies.</p>
+                    </div>
+
+                    <form id="docIngestForm" class="ingest-form">
+                        <!-- Direct File Drop / Intake -->
+                        <div class="upload-section">
+                            <label class="form-label" style="display: block; margin-bottom: 0.35rem; font-size: 0.8rem; font-weight: 500; color: var(--text-secondary);">Direct File Intake (Auto-extracts Text):</label>
+                            <div id="kbUploadDropzone" class="upload-dropzone">
+                                <input type="file" id="kbFileInput" class="file-input-hidden" accept=".pdf,.txt,.md,.json,.csv,.log">
+                                <div class="dropzone-content" style="flex-direction: row; justify-content: center; gap: 0.6rem;">
+                                    <svg class="dropzone-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="17 8 12 3 7 8"/>
+                                        <line x1="12" y1="3" x2="12" y2="15"/>
+                                    </svg>
+                                    <span class="dropzone-prompt"><strong>Select or drop file</strong> (.pdf, .txt, .md, .json)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="docTitle">Document Title <span class="char-count" id="titleCharCount">0/250</span></label>
+                            <input type="text" id="docTitle" maxlength="250" placeholder="e.g. Incident Response Escalation Matrix" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="docCategory">Category</label>
+                                <input type="text" id="docCategory" placeholder="e.g. Engineering, HR, Security" value="General">
+                            </div>
+                            <div class="form-group">
+                                <label for="docTags">Tags (comma-separated)</label>
+                                <input type="text" id="docTags" placeholder="e.g. policy, ops, dev">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="docContent">Content Body <span class="char-count" id="contentCharCount">0/100,000</span></label>
+                            <textarea id="docContent" rows="6" maxlength="100000" placeholder="Paste full document text here..." required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="docLifecycle">Retention Lifecycle (Free-Tier Guard)</label>
+                            <select id="docLifecycle">
+                                <option value="permanent">Permanent Knowledge (No Auto-Purge)</option>
+                                <option value="24h">Ephemeral Session Upload (Auto-purges in 24 hours)</option>
+                                <option value="1h">Transient Test (Auto-purges in 1 hour)</option>
+                            </select>
+                        </div>
+                        <div class="form-actions" style="margin-top: 0.5rem;">
+                            <button type="submit" id="saveDocBtn" class="btn btn-primary">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                    <polyline points="17 21 17 13 7 13 7 21"/>
+                                    <polyline points="7 3 7 8 15 8"/>
+                                </svg>
+                                Ingest Document
+                            </button>
+                            <button type="reset" class="btn btn-secondary">Reset</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Existing Documents List -->
+                <div class="workspace-card list-card">
+                    <div class="card-header-flex">
+                        <div>
+                            <h2 class="section-heading">Active Knowledge Documents</h2>
+                            <p class="section-desc">Scoped to tenant: <strong id="docListTenantDisplay">default</strong></p>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <button type="button" id="purgeDocsBtn" class="btn btn-secondary btn-sm" title="Purge transient session uploads">
+                                Purge Transient
+                            </button>
+                            <button type="button" id="refreshDocsBtn" class="btn btn-icon" title="Refresh Documents">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 4 23 10 17 10"/>
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="docsTableContainer" class="table-container">
+                        <table class="data-table" id="docsTable">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Category</th>
+                                    <th>Version</th>
+                                    <th>Content Hash</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="docsTableBody">
+                                <tr>
+                                    <td colspan="5" class="table-empty">Loading documents...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: AUDIT HISTORY & FORENSIC TRACES -->
+        <section id="historyView" class="tab-pane" aria-labelledby="tabHistoryBtn">
+            <div class="workspace-card full-width">
+                <div class="card-header-flex">
+                    <div>
+                        <h2 class="section-heading">Forensic Audit Log & Evidence History</h2>
+                        <p class="section-desc">Immutable answer-time evidence records, version snapshots, prompt metadata, and execution latency.</p>
+                    </div>
+                    <button type="button" id="refreshHistoryBtn" class="btn btn-secondary btn-sm">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                        </svg>
+                        Refresh History
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table" id="historyTable">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Question</th>
+                                <th>Model & Prompt</th>
+                                <th>Latency</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr>
+                                <td colspan="6" class="table-empty">Loading audit trail...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- FORENSIC INSPECTION MODAL -->
+    <div id="traceModal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modalTitle" class="modal-title">Forensic Audit Trace</h3>
+                    <p class="modal-subtitle">Immutable Answer-Time Evidence Record</p>
+                </div>
+                <button type="button" id="closeModalBtn" class="modal-close" aria-label="Close Modal">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <div class="spinner"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="closeModalFooterBtn" class="btn btn-secondary">Close Trace</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script src="/js/app.js"></script>
+</body>
+</html>
